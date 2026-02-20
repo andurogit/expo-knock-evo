@@ -9,7 +9,8 @@ import {
   KeyboardAvoidingView, 
   Platform, 
   ScrollView,
-  Dimensions
+  Dimensions,
+  ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -20,11 +21,77 @@ import Animated, {
   FadeInUp,
   useAnimatedStyle,
   useSharedValue,
-  withSpring
+  withSpring,
+  withTiming
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
+
+const AnimatedInput = ({ 
+  label, 
+  icon, 
+  value, 
+  onChangeText, 
+  placeholder, 
+  secureTextEntry,
+  keyboardType,
+  autoCapitalize,
+  rightIcon,
+  onRightIconPress
+}: any) => {
+  const [isFocused, setIsFocused] = useState(false);
+  
+  const animatedContainerStyle = useAnimatedStyle(() => {
+    return {
+      borderColor: withTiming(isFocused ? '#334155' : '#e2e8f0', { duration: 200 }),
+      borderWidth: withTiming(isFocused ? 1.5 : 1, { duration: 200 }),
+      backgroundColor: withTiming(isFocused ? '#fff' : '#f8fafc', { duration: 200 }),
+      transform: [{ scale: withSpring(isFocused ? 1.01 : 1) }]
+    };
+  });
+
+  const animatedIconStyle = useAnimatedStyle(() => {
+    return {
+      color: withTiming(isFocused ? '#334155' : '#94a3b8', { duration: 200 }),
+    };
+  });
+
+  return (
+    <View style={styles.inputWrapper}>
+      <Text style={[styles.label, isFocused && { color: '#334155' }]}>{label}</Text>
+      <Animated.View style={[styles.inputInner, animatedContainerStyle]}>
+        <Animated.Text style={animatedIconStyle}>
+          <Ionicons name={icon} size={18} style={styles.inputIcon} />
+        </Animated.Text>
+        <TextInput
+          style={styles.input}
+          onChangeText={onChangeText}
+          value={value}
+          placeholder={placeholder}
+          placeholderTextColor="#94a3b8"
+          secureTextEntry={secureTextEntry}
+          autoCapitalize={autoCapitalize || 'none'}
+          keyboardType={keyboardType || 'default'}
+          onFocus={() => {
+            setIsFocused(true);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }}
+          onBlur={() => setIsFocused(false)}
+        />
+        {rightIcon && (
+          <Pressable onPress={() => {
+            Haptics.selectionAsync();
+            onRightIconPress();
+          }}>
+            <Ionicons name={rightIcon} size={18} color="#94a3b8" />
+          </Pressable>
+        )}
+      </Animated.View>
+    </View>
+  );
+};
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -40,7 +107,8 @@ export default function LoginScreen() {
   }));
 
   const onPressIn = () => {
-    buttonScale.value = withSpring(0.95);
+    buttonScale.value = withSpring(0.96);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
   const onPressOut = () => {
@@ -49,6 +117,7 @@ export default function LoginScreen() {
 
   async function signInWithEmail() {
     if (!email || !password) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -60,8 +129,10 @@ export default function LoginScreen() {
     });
 
     if (error) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Login Failed', error.message);
     } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace('/(tabs)');
     }
     setLoading(false);
@@ -70,7 +141,7 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['#4facfe', '#00f2fe']}
+        colors={['#f1f5f9', '#e2e8f0']}
         style={StyleSheet.absoluteFill}
       />
       
@@ -81,67 +152,52 @@ export default function LoginScreen() {
         <ScrollView 
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           <Animated.View 
-            entering={FadeInUp.duration(1000).springify()}
+            entering={FadeInUp.duration(600).springify()}
             style={styles.headerContainer}
           >
             <View style={styles.logoContainer}>
-              <Ionicons name="notifications-outline" size={50} color="#fff" />
+              <Ionicons name="document-text-outline" size={40} color="#1e293b" />
             </View>
             <Text style={styles.title}>Policy Finder</Text>
-            <Text style={styles.subtitle}>Welcome back! Please sign in.</Text>
+            <Text style={styles.subtitle}>Professional Policy Management System</Text>
           </Animated.View>
 
           <Animated.View 
-            entering={FadeInDown.delay(200).duration(1000).springify()}
+            entering={FadeInDown.delay(150).duration(600).springify()}
             style={styles.formContainer}
           >
-            <BlurView intensity={80} tint="light" style={styles.blurCard}>
-              <View style={styles.inputWrapper}>
-                <Text style={styles.label}>Email</Text>
-                <View style={styles.inputInner}>
-                  <Ionicons name="mail-outline" size={20} color="#007AFF" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    onChangeText={setEmail}
-                    value={email}
-                    placeholder="example@mail.com"
-                    placeholderTextColor="#999"
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                  />
-                </View>
-              </View>
+            <BlurView intensity={60} tint="default" style={styles.blurCard}>
+              <AnimatedInput
+                label="Corporate Email"
+                icon="mail-outline"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="name@company.com"
+                keyboardType="email-address"
+              />
 
-              <View style={styles.inputWrapper}>
-                <Text style={styles.label}>Password</Text>
-                <View style={styles.inputInner}>
-                  <Ionicons name="lock-closed-outline" size={20} color="#007AFF" style={styles.inputIcon} />
-                  <TextInput
-                    style={[styles.input, { flex: 1 }]}
-                    onChangeText={setPassword}
-                    value={password}
-                    placeholder="Enter your password"
-                    placeholderTextColor="#999"
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                  />
-                  <Pressable onPress={() => setShowPassword(!showPassword)}>
-                    <Ionicons 
-                      name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                      size={20} 
-                      color="#999" 
-                    />
-                  </Pressable>
-                </View>
-              </View>
+              <AnimatedInput
+                label="Password"
+                icon="lock-closed-outline"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Enter password"
+                secureTextEntry={!showPassword}
+                rightIcon={showPassword ? "eye-off-outline" : "eye-outline"}
+                onRightIconPress={() => setShowPassword(!showPassword)}
+              />
 
               <Pressable 
                 style={styles.forgotPassword}
-                onPress={() => Alert.alert('Info', 'Password reset feature coming soon!')}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  Alert.alert('Security', 'Please contact your administrator for password recovery.');
+                }}
               >
-                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                <Text style={styles.forgotPasswordText}>Recover Password</Text>
               </Pressable>
 
               <Animated.View style={animatedButtonStyle}>
@@ -153,12 +209,14 @@ export default function LoginScreen() {
                   disabled={loading}
                 >
                   <LinearGradient
-                    colors={['#007AFF', '#0051D5']}
+                    colors={['#1e293b', '#0f172a']}
                     style={styles.buttonGradient}
                   >
-                    <Text style={styles.buttonText}>
-                      {loading ? 'Signing in...' : 'Sign In'}
-                    </Text>
+                    {loading ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.buttonText}>Sign In</Text>
+                    )}
                   </LinearGradient>
                 </Pressable>
               </Animated.View>
@@ -166,12 +224,15 @@ export default function LoginScreen() {
           </Animated.View>
 
           <Animated.View 
-            entering={FadeInDown.delay(400).duration(1000).springify()}
+            entering={FadeInDown.delay(300).duration(600).springify()}
             style={styles.footer}
           >
-            <Text style={styles.footerText}>Don't have an account? </Text>
-            <Pressable onPress={() => router.push('/(auth)/signup')}>
-              <Text style={styles.signUpLink}>Sign Up</Text>
+            <Text style={styles.footerText}>New to the platform? </Text>
+            <Pressable onPress={() => {
+              Haptics.selectionAsync();
+              router.push('/(auth)/signup');
+            }}>
+              <Text style={styles.signUpLink}>Create Account</Text>
             </Pressable>
           </Animated.View>
         </ScrollView>
@@ -183,6 +244,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f8fafc',
   },
   scrollContainer: {
     flexGrow: 1,
@@ -194,81 +256,83 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 6,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 15,
+    color: '#64748b',
     textAlign: 'center',
+    fontWeight: '400',
   },
   formContainer: {
     width: '100%',
-    borderRadius: 24,
+    borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#fff',
   },
   blurCard: {
     padding: 24,
-    borderRadius: 24,
   },
   inputWrapper: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-    marginLeft: 4,
+    color: '#475569',
+    marginBottom: 6,
+    marginLeft: 2,
   },
   inputInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 12,
-    height: 56,
-    borderWidth: 1,
-    borderColor: '#eee',
+    height: 52,
   },
   inputIcon: {
     marginRight: 10,
   },
   input: {
     flex: 1,
-    fontSize: 16,
-    color: '#333',
+    fontSize: 15,
+    color: '#1e293b',
   },
   forgotPassword: {
     alignSelf: 'flex-end',
     marginBottom: 24,
   },
   forgotPasswordText: {
-    color: '#007AFF',
-    fontSize: 14,
+    color: '#64748b',
+    fontSize: 13,
     fontWeight: '500',
+    textDecorationLine: 'underline',
   },
   button: {
-    height: 56,
-    borderRadius: 12,
+    height: 52,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   buttonGradient: {
@@ -277,12 +341,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   disabledButton: {
-    opacity: 0.7,
+    opacity: 0.8,
   },
   buttonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   footer: {
     flexDirection: 'row',
@@ -290,13 +355,12 @@ const styles = StyleSheet.create({
     marginTop: 30,
   },
   footerText: {
-    color: '#fff',
-    fontSize: 15,
+    color: '#64748b',
+    fontSize: 14,
   },
   signUpLink: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: 'bold',
-    textDecorationLine: 'underline',
+    color: '#0f172a',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

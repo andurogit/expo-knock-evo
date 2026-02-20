@@ -1,8 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TextInput, Pressable, ScrollView, Alert } from 'react-native';
+import { StyleSheet, View, Text, TextInput, Pressable, ScrollView, Alert, Dimensions, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { FontAwesome } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
+
+const { width } = Dimensions.get('window');
+
+const SettingsItem = ({ icon, label, value, type = 'chevron', onPress }: any) => (
+  <Pressable 
+    style={styles.settingsItem} 
+    onPress={() => {
+      Haptics.selectionAsync();
+      onPress?.();
+    }}
+  >
+    <View style={styles.settingsIconWrapper}>
+      <Ionicons name={icon} size={20} color="#64748b" />
+    </View>
+    <View style={styles.settingsContent}>
+      <Text style={styles.settingsLabel}>{label}</Text>
+      {value && <Text style={styles.settingsValue}>{value}</Text>}
+    </View>
+    {type === 'chevron' && <Ionicons name="chevron-forward" size={18} color="#cbd5e1" />}
+    {type === 'switch' && <Switch trackColor={{ false: '#e2e8f0', true: '#1e293b' }} />}
+  </Pressable>
+);
 
 export default function MyPageScreen() {
   const router = useRouter();
@@ -20,6 +45,7 @@ export default function MyPageScreen() {
   }, []);
 
   const handleLogout = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const { error } = await supabase.auth.signOut();
     if (error) {
       Alert.alert(error.message);
@@ -28,54 +54,65 @@ export default function MyPageScreen() {
     }
   };
 
-  const saveResidence = () => {
-    setIsEditing(false);
-    Alert.alert('Success', 'Residence updated successfully!');
-  };
-
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.avatar}>
-          <FontAwesome name="user" size={40} color="#fff" />
-        </View>
-        <Text style={styles.emailText}>{email}</Text>
-      </View>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <LinearGradient
+        colors={['#1e293b', '#0f172a']}
+        style={styles.header}
+      >
+        <Animated.View entering={FadeInUp.duration(600).springify()} style={styles.profileInfo}>
+          <View style={styles.avatarWrapper}>
+            <Ionicons name="person" size={40} color="#fff" />
+            <Pressable style={styles.editAvatar}>
+              <Ionicons name="camera" size={16} color="#1e293b" />
+            </Pressable>
+          </View>
+          <Text style={styles.emailText}>{email}</Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>Verified Account</Text>
+          </View>
+        </Animated.View>
+      </LinearGradient>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Residence Information</Text>
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Current Residence</Text>
-          {isEditing ? (
-            <TextInput
-              style={styles.input}
-              value={residence}
-              onChangeText={setResidence}
-              placeholder="e.g. Gangnam-gu, Seoul"
+      <View style={styles.content}>
+        <Animated.View entering={FadeInDown.delay(100).duration(600).springify()}>
+          <Text style={styles.sectionTitle}>Account Settings</Text>
+          <View style={styles.settingsGroup}>
+            <SettingsItem 
+              icon="mail-outline" 
+              label="Email Address" 
+              value={email}
             />
-          ) : (
-            <Text style={styles.residenceText}>
-              {residence || 'No residence information set'}
-            </Text>
-          )}
-        </View>
+            <SettingsItem 
+              icon="location-outline" 
+              label="Primary Residence" 
+              value={residence || 'Not set'}
+              onPress={() => setIsEditing(true)}
+            />
+            <SettingsItem 
+              icon="notifications-outline" 
+              label="Push Notifications" 
+              type="switch"
+            />
+          </View>
+        </Animated.View>
 
-        {isEditing ? (
-          <Pressable style={styles.saveButton} onPress={saveResidence}>
-            <Text style={styles.saveButtonText}>Save Residence</Text>
-          </Pressable>
-        ) : (
-          <Pressable style={styles.editButton} onPress={() => setIsEditing(true)}>
-            <Text style={styles.editButtonText}>Edit Residence</Text>
-          </Pressable>
-        )}
-      </View>
+        <Animated.View entering={FadeInDown.delay(200).duration(600).springify()}>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          <View style={styles.settingsGroup}>
+            <SettingsItem icon="shield-checkmark-outline" label="Privacy Policy" />
+            <SettingsItem icon="document-text-outline" label="Terms of Service" />
+            <SettingsItem icon="help-circle-outline" label="Support Center" />
+          </View>
+        </Animated.View>
 
-      <View style={styles.logoutSection}>
-        <Pressable style={styles.logoutButton} onPress={handleLogout}>
-          <FontAwesome name="sign-out" size={20} color="#FF3B30" />
-          <Text style={styles.logoutText}>Log Out</Text>
-        </Pressable>
+        <Animated.View entering={FadeInDown.delay(300).duration(600).springify()}>
+          <Pressable style={styles.logoutButton} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+            <Text style={styles.logoutText}>Terminate Session</Text>
+          </Pressable>
+          <Text style={styles.versionText}>Version 1.0.0 (Build 2402)</Text>
+        </Animated.View>
       </View>
     </ScrollView>
   );
@@ -84,104 +121,136 @@ export default function MyPageScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f8fafc',
   },
   header: {
-    backgroundColor: '#007AFF',
-    padding: 30,
+    paddingTop: 80,
+    paddingBottom: 40,
     alignItems: 'center',
-    justifyContent: 'center',
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
   },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  profileInfo: {
+    alignItems: 'center',
+  },
+  avatarWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 15,
+    marginBottom: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  editAvatar: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   emailText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  section: {
-    padding: 20,
-    backgroundColor: '#fff',
-    marginTop: 20,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#eee',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#333',
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 20,
+    fontWeight: '700',
     marginBottom: 8,
   },
-  input: {
-    height: 50,
-    borderColor: '#ddd',
+  badge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  residenceText: {
-    fontSize: 16,
-    color: '#333',
-    paddingVertical: 10,
-  },
-  editButton: {
-    backgroundColor: '#f0f0f0',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  editButtonText: {
-    color: '#007AFF',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  saveButton: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  saveButtonText: {
+  badgeText: {
     color: '#fff',
+    fontSize: 12,
     fontWeight: '600',
-    fontSize: 16,
+    textTransform: 'uppercase',
   },
-  logoutSection: {
-    marginTop: 40,
-    paddingHorizontal: 20,
-    marginBottom: 40,
+  content: {
+    padding: 24,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#64748b',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  settingsGroup: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 24,
+  },
+  settingsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  settingsIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#f8fafc',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  settingsContent: {
+    flex: 1,
+  },
+  settingsLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  settingsValue: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 2,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 15,
-    borderRadius: 8,
+    backgroundColor: '#fff',
+    padding: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#FF3B30',
+    borderColor: '#fee2e2',
+    marginTop: 12,
   },
   logoutText: {
-    color: '#FF3B30',
+    color: '#ef4444',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     marginLeft: 10,
   },
+  versionText: {
+    textAlign: 'center',
+    color: '#94a3b8',
+    fontSize: 12,
+    marginTop: 24,
+    marginBottom: 40,
+  }
 });
