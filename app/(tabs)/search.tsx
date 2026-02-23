@@ -20,28 +20,36 @@ export default function SearchScreen() {
       setLoading(true);
       setErrorMsg(null);
       
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setErrorMsg('Permission to access location was denied');
+      const isServiceEnabled = await Location.hasServicesEnabledAsync();
+      if (!isServiceEnabled) {
+        setErrorMsg('Location services are disabled.');
         setLoading(false);
         return;
       }
 
-      // Try to get last known position first for faster response
-      let lastKnown = await Location.getLastKnownPositionAsync({});
-      if (lastKnown) {
-        setLocation(lastKnown);
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setErrorMsg('Location permission denied.');
+        setLoading(false);
+        return;
       }
 
-      // Then get current position with a timeout and lower accuracy if needed
+      // Try to get current position with a timeout
       let currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
+        timeout: 5000,
       });
       setLocation(currentLocation);
-    } catch (error) {
-      console.error(error);
-      setErrorMsg('Could not fetch your current location. Please check if GPS is enabled.');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } catch (error: any) {
+      console.warn('Location Error:', error.message);
+      setErrorMsg('Could not find your location.');
+      
+      // Try last known as a secondary fallback
+      try {
+        let lastKnown = await Location.getLastKnownPositionAsync({});
+        if (lastKnown) setLocation(lastKnown);
+      } catch (e) {}
+
     } finally {
       setLoading(false);
     }
@@ -56,26 +64,11 @@ export default function SearchScreen() {
     setRadiusIndex(index);
   };
 
-  if (loading || errorMsg) {
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        {loading ? (
-          <>
-            <ActivityIndicator size="large" color="#1e293b" />
-            <Text style={styles.loadingText}>Locating nearest policies...</Text>
-          </>
-        ) : (
-          <View style={styles.errorContainer}>
-            <Ionicons name="location-off-outline" size={48} color="#ef4444" />
-            <Text style={styles.errorText}>{errorMsg}</Text>
-            <TouchableOpacity 
-              style={styles.retryButton}
-              onPress={fetchLocation}
-            >
-              <Text style={styles.retryButtonText}>Retry Discovery</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        <ActivityIndicator size="large" color="#1e293b" />
+        <Text style={styles.loadingText}>Locating nearest policies...</Text>
       </View>
     );
   }
@@ -87,8 +80,8 @@ export default function SearchScreen() {
         initialRegion={{
           latitude: location?.coords.latitude || 37.5665,
           longitude: location?.coords.longitude || 126.9780,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
+          latitudeDelta: 0.1,
+          longitudeDelta: 0.1,
         }}
       >
         {location && (
@@ -122,9 +115,21 @@ export default function SearchScreen() {
       <View style={styles.topBar}>
         <BlurView intensity={80} tint="light" style={styles.blurTop}>
           <Text style={styles.topTitle}>Nearby Analysis</Text>
-          <Text style={styles.topSubtitle}>Policies within range</Text>
+          <Text style={styles.topSubtitle}>
+            {errorMsg ? errorMsg : 'Policies within range'}
+          </Text>
         </BlurView>
       </View>
+
+      {errorMsg && (
+        <TouchableOpacity 
+          style={styles.errorBanner}
+          onPress={fetchLocation}
+        >
+          <Ionicons name="warning-outline" size={16} color="#fff" />
+          <Text style={styles.errorBannerText}>{errorMsg} Tap to retry.</Text>
+        </TouchableOpacity>
+      )}
 
       <View style={styles.controls}>
         <BlurView intensity={90} tint="light" style={styles.blurControls}>
@@ -153,7 +158,10 @@ export default function SearchScreen() {
 
       <TouchableOpacity 
         style={styles.locateButton}
-        onPress={() => Haptics.selectionAsync()}
+        onPress={() => {
+          Haptics.selectionAsync();
+          fetchLocation();
+        }}
       >
         <Ionicons name="locate" size={24} color="#1e293b" />
       </TouchableOpacity>
@@ -181,28 +189,28 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
   },
-  errorContainer: {
-    alignItems: 'center',
-    padding: 24,
-  },
-  errorText: {
-    marginTop: 16,
-    color: '#64748b',
-    fontSize: 15,
-    textAlign: 'center',
-    marginBottom: 24,
-    fontWeight: '500',
-  },
-  retryButton: {
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+  errorBanner: {
+    position: 'absolute',
+    top: 140,
+    left: 20,
+    right: 20,
+    backgroundColor: '#ef4444',
+    padding: 10,
     borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  retryButtonText: {
+  errorBannerText: {
     color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   topBar: {
     position: 'absolute',
