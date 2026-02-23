@@ -47,9 +47,3 @@ Policy Finder는 사용자의 거주지 및 관심 분야에 맞는 정부 및 �
 - `app/policy`: 정책 상세 페이지
 - `lib/supabase`: Supabase 설정 및 API 연동
 - `components`: 공통 UI 컴포넌트
-
-- `app/(tabs)`: 메인 탭 화면 (Home, Search, My Page)
-- `app/(auth)`: 로그인 및 회원가입
-- `app/policy`: 정책 상세 페이지
-- `lib/supabase`: Supabase 설정 및 API 연동
-- `components`: 공통 UI 컴포넌트
