@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
-import MapView, { Marker, Circle, PROVIDER_GOOGLE } from 'react-native-maps';
+import { StyleSheet, View, Text, TouchableOpacity, Dimensions, ActivityIndicator, Platform } from 'react-native';
+import MapView, { Marker, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -8,6 +8,9 @@ import * as Haptics from 'expo-haptics';
 
 const { width, height } = Dimensions.get('window');
 const RADII = [1000, 5000, 10000];
+
+// 데모 모드 설정 (API 키가 없을 때 true로 두면 크래시를 방지합니다)
+const IS_DEMO_MODE = true; 
 
 export default function SearchScreen() {
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
@@ -34,21 +37,27 @@ export default function SearchScreen() {
         return;
       }
 
-      // Try to get current position with a timeout
       let currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
-        timeout: 5000,
       });
       setLocation(currentLocation);
     } catch (error: any) {
       console.warn('Location Error:', error.message);
-      setErrorMsg('Could not find your location.');
+      setErrorMsg('Using default location for demo.');
       
-      // Try last known as a secondary fallback
-      try {
-        let lastKnown = await Location.getLastKnownPositionAsync({});
-        if (lastKnown) setLocation(lastKnown);
-      } catch (e) {}
+      // 데모를 위한 기본 위치 설정 (서울역 인근)
+      setLocation({
+        coords: {
+          latitude: 37.5547,
+          longitude: 126.9706,
+          altitude: null,
+          accuracy: null,
+          altitudeAccuracy: null,
+          heading: null,
+          speed: null,
+        },
+        timestamp: Date.now(),
+      } as any);
 
     } finally {
       setLoading(false);
@@ -68,23 +77,43 @@ export default function SearchScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#1e293b" />
-        <Text style={styles.loadingText}>Locating nearest policies...</Text>
+        <Text style={styles.loadingText}>Preparing Map Analysis...</Text>
       </View>
     );
   }
 
-  return (
-    <View style={styles.container}>
+  // 지도를 렌더링할지, 데모용 플레이스홀더를 보여줄지 결정
+  const renderMap = () => {
+    if (IS_DEMO_MODE && Platform.OS === 'android') {
+      return (
+        <View style={[styles.map, styles.demoMapContainer]}>
+          <View style={styles.gridPattern} />
+          <Ionicons name="map-outline" size={80} color="#cbd5e1" />
+          <Text style={styles.demoText}>Demo Map View</Text>
+          <Text style={styles.demoSubText}>API Key required for live Google Maps</Text>
+          
+          {/* 가짜 위치 표시자 */}
+          <View style={styles.demoMarkerContainer}>
+             <View style={styles.markerCircle}>
+              <View style={styles.markerInner} />
+            </View>
+            <View style={styles.demoCircle} />
+          </View>
+        </View>
+      );
+    }
+
+    return (
       <MapView
         style={styles.map}
         initialRegion={{
           latitude: location?.coords.latitude || 37.5665,
           longitude: location?.coords.longitude || 126.9780,
-          latitudeDelta: 0.1,
-          longitudeDelta: 0.1,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
         }}
       >
-        {location && (
+        {location?.coords && (
           <>
             <Marker
               coordinate={{
@@ -111,6 +140,12 @@ export default function SearchScreen() {
           </>
         )}
       </MapView>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      {renderMap()}
 
       <View style={styles.topBar}>
         <BlurView intensity={80} tint="light" style={styles.blurTop}>
@@ -120,16 +155,6 @@ export default function SearchScreen() {
           </Text>
         </BlurView>
       </View>
-
-      {errorMsg && (
-        <TouchableOpacity 
-          style={styles.errorBanner}
-          onPress={fetchLocation}
-        >
-          <Ionicons name="warning-outline" size={16} color="#fff" />
-          <Text style={styles.errorBannerText}>{errorMsg} Tap to retry.</Text>
-        </TouchableOpacity>
-      )}
 
       <View style={styles.controls}>
         <BlurView intensity={90} tint="light" style={styles.blurControls}>
@@ -177,6 +202,41 @@ const styles = StyleSheet.create({
   map: {
     ...StyleSheet.absoluteFillObject,
   },
+  demoMapContainer: {
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gridPattern: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.05,
+    backgroundColor: '#94a3b8',
+  },
+  demoText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#64748b',
+    marginTop: 12,
+  },
+  demoSubText: {
+    fontSize: 14,
+    color: '#94a3b8',
+    marginTop: 4,
+  },
+  demoMarkerContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoCircle: {
+    position: 'absolute',
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 2,
+    borderColor: 'rgba(30, 41, 59, 0.2)',
+    backgroundColor: 'rgba(30, 41, 59, 0.05)',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -188,29 +248,6 @@ const styles = StyleSheet.create({
     color: '#64748b',
     fontSize: 15,
     fontWeight: '500',
-  },
-  errorBanner: {
-    position: 'absolute',
-    top: 140,
-    left: 20,
-    right: 20,
-    backgroundColor: '#ef4444',
-    padding: 10,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  errorBannerText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-    marginLeft: 8,
   },
   topBar: {
     position: 'absolute',
@@ -316,6 +353,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(30, 41, 59, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
   },
   markerInner: {
     width: 14,
